@@ -1,0 +1,1725 @@
+---
+title: "Cotton"
+author: "Naidu"
+date: "15/02/2021"
+output: html_document
+---
+
+# 1.Setting  and Gettig Working Directory
+
+
+```{r setup, include=FALSE}
+# Setting Working Directory
+
+
+setwd("D:/ProductDevelopment/R_Projects/Cotton/cotton_SC/HAT")
+
+#Get Working Directory
+getwd()
+
+
+```
+
+#####################################################################################
+
+#2. Setting the of rquired Packages 
+
+
+```{r, eval = FALSE, eHCo= TRUE}
+
+#Required packages 
+install.packages("tidyverse")
+install.packages("plotrix")
+install.packages("reshape", type = "source")
+install.packages("reshape2", type = "source")
+install.packages(c("xlsx","openxlsx"))
+install.packages("writexl", type = "source")
+install.packages("openxlsx")
+install.packages("officer")
+devtools::install_github("omegahat/RDCOMClient")
+install.packages("export")
+install.packages("R2PPT")
+install.packages("rJava")
+install.packages("ggpmisc")
+install.packages("leaflet")
+install.packages("mapview")
+
+install.packages("remotes")
+remotes::install_github("xl0418/ggradar2")
+
+install.packages("remotes")
+remotes::install_github("ricardo-bion/ggradar")
+```
+
+######################################################################################
+
+
+# 3. Setting the of rquired Libraries 
+
+
+
+```{r, eval=TRUE, eHCo = TRUE, warning=FALSE, message=FALSE,results ="hide"}
+
+# Required Libraries
+library(metan)
+library(gridExtra)
+library(grid)
+library(rJava)
+library(R2PPT)
+library(officer)
+library(rvg)
+library(writexl)
+library(readxl)
+library(xlsxjars)
+library(xlsx)
+library(tidyverse)
+library(dplyr)
+library(reshape2)
+library(lubridate)
+library(ggrepel)
+library(ggplot2)
+library(plotrix)
+library(gridExtra)
+library(tibble)
+library(gridExtra)
+library(stringr)
+library(tibble)
+library(ggpmisc)
+library(openxlsx)
+library(ggridges)
+library(leaflet)
+library(ggradar2)
+library(ggradar)
+library(janitor)
+```
+
+
+######################################################################################
+
+# 4. Creating Sample PPT(Power Point Presentation ) Report  
+
+
+```{r}
+# Sample PPT report 
+
+gg_plot <- ggplot(data = iris ) +
+    geom_point(mapping = aes(Sepal.Length, Petal.Length, 
+                             color = Species), size = 3) + 
+    theme_minimal()
+
+doc <- read_pptx()
+doc <- add_slide(doc)
+doc <- ph_with(x = doc, value = gg_plot,
+               location = ph_location_fullsize() )
+doc <- ph_with(x = doc, "a ggplot example",
+               location = ph_location_type(
+                   type = "title") )
+print(doc, target = "example.pptx")
+
+```
+
+######################################################################################
+
+
+# 5. Import  Data file and preparing  Dataset for Analysis 
+
+
+```{r}
+
+# Impost Excel file of  2021 Rainy cotton data  
+
+cottonHATData2020 <- read_excel("D:/ProductDevelopment/R_Projects/Cotton/cotton_SC/HAT/Data/2020-21_HAT_Cotton_SC_Rainy.xlsx", sheet = "HAT")
+
+# Creating new varaibles - Post flowering Stalkrot
+
+cottonData <- cottonHATData2020 %>% 
+   mutate( Wiltscore = if_else(Wilt  >= 0 &  Wilt <= 3, 1,
+                    if_else(Wilt >3 &  Wilt  <= 5, 2,
+                            if_else(Wilt  > 5 & Wilt  <= 10, 3,
+                                    if_else( Wilt  > 10 &  Wilt  <= 20, 4,
+                                         if_else( Wilt  > 20, 5, 1)))))) %>% 
+  arrange(State, Trial, Hybtype, Hybrid)
+
+#Looking  at Data
+class(cottonData)
+head(cottonData, 10)
+tail(cottonData, 10)
+dim(cottonData)
+colnames(cottonData)
+row.names(cottonData)
+str(cottonData)
+
+```
+
+# Importing the input Data  
+
+   1. Already Dataset created during Head to head Analysis and this  dataset is saved
+      folder,'Data',  of HAT subfolder, 'HAT'.  
+     
+   2. From this  dataset the predicted yield(computed  by  covariance anlysis of 
+      addjusting actual yield and  plant acre for eaHC trial)
+  
+   3. Dataset contains 85  trial Location data. There  are 3 new hybrids  and 12 
+      HCecks
+      
+   4. The New Hybrids  are included in all 85 locations. The HCecks are different in 
+      eaHC state
+   
+   5. There 42 location whiHC have  five common  hybrids: New Hybrids and  
+      HCecks(Aatish and RHC659) 
+      
+   6. GxE Analysis will be perfromed  for yield  42 locations and  for five  hybrids, 
+      HC20103, HC20105, HC20107
+
+
+
+1. Identificaon of Selection Hybrids  and creation of dataset for GE analysis
+
+```{r}
+# Creation of Dataset 
+
+  cottonGE <- cottonData %>% 
+      filter(Hybrid %in% c("HC20103","HC20105","HC20107","Aatish","RCH659")) %>% 
+      select(Id, State, Trial, Loc, Lat, Long, Hybrid, Hybtype, Cultivation, District, 
+             Market, Village,Yield) %>% 
+      group_by(Trial) %>% 
+      mutate(Number = n()) %>% 
+      filter(Number == 5) 
+  
+   cottonGE_Trials <- cottonGE %>% 
+       group_by(Cultivation, Hybrid) %>% 
+           summarise( Trials = n(), .groups ="drop")
+   
+#Output the Results 
+
+   cottonGE_Trials
+
+  write_xlsx(list(cottonGE_Data =     cottonGE ,
+                  Cultivation_Hybrid_trials = cottonGE_Trials ),
+    "D:/ProductDevelopment/R_Projects/Cotton/Cotton_SC/HAT/GxEAnalysis/Results/GE1_Cultivation_Hybrids_Trials.xlsx")
+
+
+```
+
+
+#2. Looking  at the  Data  
+
+```{r}
+
+#HCeck Data Dimenstions - number of Columns and Rows
+  dim(cottonGE )
+
+#HCeck Class of  Data : Matrix, list, or Data frame
+  class( cottonGE )
+
+#Get the Column or Variable Names
+ colnames(cottonGE )
+
+#Display of top 5 rows of data
+  head(cottonGE, 5)
+
+# Display of bottom  5 rows of data
+  tail(cottonGE , 5)
+  
+#Converting Locations, Hybrids and State  as factors
+
+   cottonGE$Loc <- as.factor( cottonGE$Loc)
+   cottonGE$Hybrid <- as.factor( cottonGE$Hybrid)
+   cottonGE$State <- as.factor( cottonGE$State)
+   cottonGE$Trial<- as.factor(cottonGE$Trial )
+
+
+#Computing  overall Means of Hybrids 
+      
+Hybrid_Culvation_Means <- cottonGE %>% 
+     group_by(Cultivation, Hybrid) %>% 
+     summarize (Total_Trials = n(),
+                Yield = round(mean(Yield),0), .groups= "drop")
+   
+
+#Computing  HybridsMeans over the States 
+
+
+StateWise_summary <- cottonGE %>% 
+     select(Cultivation, Trial, State, Hybrid, Hybtype, Yield) %>% 
+     group_by(Cultivation, State,Hybrid, Hybtype) %>% 
+     summarize (Trials = n(),
+                Yield = round(mean(Yield),0), .groups= "drop") %>% 
+    gather(key = "Type", value = "Value", Trials, Yield) %>% 
+    unite(Variable, Type, State) %>% 
+    spread(Variable, Value) %>% 
+           cbind(Hybrid_Culvation_Means) %>% 
+           select(Hybtype,
+           Hybrid,
+           Trials_AP,Yield_AP,
+           Trials_KA,Yield_KA,
+           Trials_MP,Yield_MP,
+           Trials_MR,Yield_MR,
+           Trials_TS,Yield_TS,
+           Total_Trials, Yield,-15)
+
+
+#print Output
+
+  Hybrid_Culvation_Means
+  StateWise_summary
+
+
+write_xlsx(list(Cultiv_HybMeans =  Hybrid_Culvation_Means,
+                  Statewise_means = StateWise_summary ),
+    "D:/ProductDevelopment/R_Projects/Cotton/Cotton_SC/HAT/GxEAnalysis/Results/GE2_Hybrid_State_means.xlsx")
+ 
+```
+
+#############################################################################################
+
+
+# 3.HCeck for Distribution and common errors in multi-environment trial data
+      - HCecking class (numeric or factor)
+      - Summary of Error HCecking Results and Warning Messages of data 
+      - Plot typical multi-environment trial data
+      - Presence of possible outliers
+      - Listing the outliers data
+      - Missing Values
+
+#  It is suggested that before applying any statistical analyses, the utliers are to be HCecked
+      1. Select Trait for whiHC outliers  to be identified 
+      2. Identify the rows that contain outliers
+      3. Examine  these rows and decide whether to delete or keep  these rows 
+      4. Generally examning outliers  for plantstand(plants/acre) and Yield  is very important 
+      
+
+# 3a. G X E  Analysis : Though Predicted Yield  is computed adjusting palnts/acre, we are 
+   using Actual  for G X E Analysis 
+
+### 13.a. Ouliers for Actual Yield
+ 
+ 
+```{r}
+
+Hybrid_Culvation_Means
+#summerizind data for median mean  and Quartiles  for Yield 
+
+   yield_summary <- summary( cottonGE$Yield )
+  
+# Estimate interquartile range
+# (3rd quartile minus 1st quartile)
+
+   iqr <- yield_summary[[5]] - yield_summary[[2]]
+
+# Identify bounds for outliers
+
+  lower_bound <- yield_summary[[2]] - (1.5 * iqr)
+  upper_bound <- yield_summary[[5]] + (1.5 * iqr)
+
+  outliers <- cottonGE %>% 
+    select(Trial, State, Hybrid, Hybtype, Yield ) %>% 
+   filter(Yield  > upper_bound |Yield  < lower_bound)
+   
+
+# Remove outliers from dataframe
+# Keep only the points within the bounds
+# we are not removing outliers from the dataset     
+     no_outliers <- cottonGE %>%
+     filter(Yield   < upper_bound & Yield  > lower_bound)
+  
+# HCeck range of no_outliers to make sure it's within bounds
+  rangeouliers <- range(no_outliers$Yield )
+       
+#Outputing  the outliers
+     yield_summary
+     iqr
+     lower_bound
+     upper_bound 
+     outliers 
+     dim(outliers)
+     class( yield_summary)
+  
+write_xlsx(list(outliers_yield = outliers) ,
+     "D:/ProductDevelopment/R_Projects/Cotton/Cotton_SC/HAT/GxEAnalysis/Results/GE3_Outliers.xlsx")
+
+```
+
+
+
+
+ 
+## 3.b. Inspecting data
+
+  Inspecting data for data distribution, outliers, missing data
+  
+```{r}
+
+# library(metan)
+# Inspection Plot 
+
+
+  cottonGE_ins <-  cottonGE %>% 
+        ungroup %>% 
+        select(Loc, Hybrid, Yield) 
+        
+  Inspect_plot <- inspect(cottonGE_ins ,
+                 threshold = 42,
+                plot = TRUE)
+ Inspect_plot
+```
+
+
+
+####  Descriptive statistics suHC as overall mean, median, CV, minimum, maximum are computed 
+
+
+```{r}
+cotton_ge_data  <- cottonGE %>% 
+    select(State,Trial, Loc,Hybrid, Hybtype,District, Market, Village,Yield) 
+cotton_desc <- desc_stat(cotton_ge_data)
+  options(digits = 4)
+
+#Print descriptive statistics 
+  cotton_desc
+  
+
+```
+
+
+
+
+
+## Details for Genotype-Environment Trials
+
+####	
+
+|  * Mean: grand mean
+|  * SE  : standard error of the mean
+|  * SD  : standard deviation
+|  * CV  : coefficient of variation
+|  * Min,Max: minimum and maximum value
+|  * MinENV, MinGEN: environment and genotype with the lower      mean
+|  * MaxENV, MaxGEN: environment and genotype with the higher mean
+
+
+```{r}
+#Details for genotype-environment trials
+   
+   cotton_ge_data_final <-  cotton_ge_data %>% 
+                      ungroup
+                      
+   gxe_details <- ge_details(cotton_ge_data_final,
+                env = Loc,
+                gen = Hybrid,
+                resp = Yield)
+# Print Details
+   gxe_details
+   
+
+   
+   
+ write_xlsx(list(outliers_yield = outliers,
+                 cotton_desc = cotton_desc,
+                gxe_details =  gxe_details) ,
+       "D:/ProductDevelopment/R_Projects/Cotton/Cotton_SC/HAT/GxEAnalysis/Results/GE4_Outliers_descriptivestat.xlsx")  
+   
+   
+```  
+
+   
+### Compute Descriptive  for overall Data 
+   
+``` {r}
+
+#library(metan)
+#Compute Descriptive  for overall Data:
+
+Overall_stat <- desc_stat(cotton_ge_data_final,
+                                stats = "main",
+                                hist = FALSE,
+                                level = 0.95,
+                                digits = 2,
+                                na.rm = TRUE,
+                                verbose = TRUE)
+
+#Descriptive Statistics for Hybrids     
+ cottonGE_stat <- cotton_ge_data_final %>%
+         group_by(Hybrid) %>%  
+         desc_stat( stats = "main",
+                                hist = FALSE,
+                                level = 0.95,
+                                digits = 2,
+                                na.rm = TRUE,
+                                verbose = TRUE) 
+
+#print outputs
+
+Overall_stat                               
+cottonGE_stat
+
+
+write_xlsx(list(Overall_stat = Overall_stat,
+                cottonGE_stat = cottonGE_stat) ,
+           "D:/ProductDevelopment/R_Projects/Cotton/Cotton_SC/HAT/GxEAnalysis/Results/GE5_Descritive_stat.xlsx")
+```
+
+   
+   
+# Heat map and Line Plot of the Hybrid performance across the Locations
+
+####   
+
+ * Heat map and a line plot created for graphical
+   interpretation of the genotype-vs-environment 
+   interaction. 
+
+ * Heatmap:  Hybridsare dipicted in the x axis and
+   environments are in y axis  for creating heat map for
+   yield 
+   
+ * Line plot: The evironments are in the x axis and the
+   genotypes are depicted by different lines. The y axis
+   represent  the mean yield 
+
+```{r}
+ ge_plot1 <-  ge_plot(cottonGE_ins, 
+                     env = Loc,
+                     gen = Hybrid,
+                     Yield)
+ ge_plot2 <-  ge_plot(cottonGE_ins, 
+                     env = Loc,
+                     gen = Hybrid,
+                     Yield,
+                     type =2)
+ ge_plot1
+ ge_plot2
+ 
+```
+
+
+
+
+# library(lme4)
+# Analysis of Variance  for Yield over  the Locations 
+# Analysis of data based random model
+# Varibales used for this Analysis
+
+library(lme4)
+
+#Computing  overall Means of Hybrids 
+      
+Hybrid_Means <- cottonGE %>% 
+     group_by(Hybrid) %>% 
+     summarize (Trials = n(),
+                Yield = round(mean(Yield),0), .groups= "drop")
+
+# Prepared dataset for BLUP nalysis\
+
+  cottonGE_anov <- cotton_ge_data_final %>% 
+    select(State, Loc, Hybrid, Yield )
+
+#Fitmodel
+
+   GxE_analyis <- lmer(Yield ~ (1|Hybrid + (1|Loc)+ (1|State), data = cottonGE_anov)
+
+
+#model summary
+ 
+   GxE_summary <- summary( GxE_analyis)
+
+#variances of random factors
+    
+   Variance <- as.data.frame(GxE_summary$varcor)
+
+#drop rownames
+
+   rownames(Variance) <- NULL
+   Variance_final <- Variance %>% 
+       select(-var1, -var2) %>% 
+   dplyr::rename(Source = grp, 
+          Variance = vcov, 
+          StandardDev = sdcor)
+
+#BLUP for  Hybrids   
+#Estimate BLUP - Best linear unbiased predictor
+#Return estimate of fixed effect from full model summary to compute BLUP
+
+    Fixestimate <- as.data.frame(GxE_summary$coefficients)
+  
+#compute BLUP value
+
+    BLUP_Hybrid_1 <- effect("Hybrid", GxE_analyis  )
+    BLUP_Hybrid_2 <- as.data.frame(  BLUP_Hybrid_1) %>% 
+                      cbind(Hybrid_Means) %>% 
+                      select(-6) %>% 
+                      rename(PredictedYield = fit,
+                             ObservedYield = Yield) %>% 
+                     select(Hybrid, Trials,ObservedYield, PredictedYield,
+                            lower, upper, se)
+
+ #Final output for BLUP for cultivars
+  
+ ## Creating plots with the BLUPs
+
+   BLUP_plot <- ggplot( BLUP_Hybrid_2,                
+           aes(x = PredictedYield,
+               y = Hybrid,
+               xmin = lower, 
+               xmax = upper)) +
+      geom_errorbar(position = position_dodge(width = 0.5), 
+                    width = 0.5) +
+      geom_point(size = 4, color = "orange") +
+      theme_bw() +
+      labs(title = "Best Linear Unbiased Predictor for Hybrids",  
+             y  = "Hybrids" ,
+             x  = "BLUP for Hybrids")+
+      theme(panel.background = element_rect(fill = "lightblue"),
+      plot.background = element_rect(fill = 'pink'),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      plot.title = element_text(color="blue", size=25, face="bold.italic"),
+      axis.title.x = element_text(color="blue", size=20, face="bold"),
+      axis.text.x = element_text(hjust = 1, size=16,color="black"),
+      axis.text.y = element_text(hjust = 1, size=16,color="black"),
+      axis.title.y = element_text(color="#993333", size=20, face="bold")) 
+    
+
+  
+
+    
+# print outputs
+  Variance_final
+  BLUP_Hybrid_2
+  BLUP_plot
+  
+  write_xlsx(list(Variance_stat = Variance_final,
+                Blup_Estimates = BLUP_Hybrid_2) ,
+           "D:/ProductDevelopment/R_Projects/Cotton/Cotton_SC/HAT/GxEAnalysis/Results/GE6_Blup_stat.xlsx")
+           
+```
+
+
+
+
+
+
+
+### 4. Descriptive statistics  - Preparing Tables for Locations, Hybrids and Hybrid 
+  x Locations Means
+
+```{r}
+#library(reshape2)
+#Loading the library(lattice),library(metan)
+#ExtractingLocironments andHybridotypes 
+
+  cottonGE$Loc <- reorder(cottonGE$Loc,cottonGE$Yield , mean )
+  cottonGE$Hybrid <- reorder(cottonGE$Hybrid,cottonGE$Yield , mean )
+ 
+
+#Means Over the location
+
+  Loc_mean <- tapply(cottonGE$Yield, cottonGE$Loc, mean )
+
+ 
+#Means of Hybrids over the Locations 
+
+  Hybrid_mean <- tapply(cottonGE$Yield ,cottonGE$Hybrid, mean)
+  
+
+#Summary Tables of Hybrid  and Locatopn Means
+
+  cottonGE_dm <- melt(cottonGE, measure.var = "Yield", 
+                   id.var = c("Hybrid", "Loc"))
+
+#Hybrid Versus Location t Mean Table
+
+   HybridxLoc_mean <- round(acast( cottonGE_dm ,Hybrid~Loc, mean ),2)
+   
+
+#Adding marginal Hybrid andLocironmental Means  
+
+   HybridxLoc_mean_table <- rbind(cbind(HybridxLoc_mean, Mean_yield = Hybrid_mean),
+                          LocIndex = Loc_mean)
+   HybridxLoc_mean_Summary <-  as.data.frame(HybridxLoc_mean_table) %>% 
+       rownames_to_column(var = "Hybrid") %>% 
+       mutate_at(vars(Mean_yield),funs(ifelse(row_number() %in% n() , 
+                 NA, .))) %>% 
+        mutate_if(is.numeric, round,0)                   
+
+ 
+#Coverting to dataframes 
+
+  Loc_mean <- as.data.frame(Loc_mean)
+  Hybrid_mean <- as.data.frame(Hybrid_mean)
+  
+
+  
+# Hybrid Versus Location  Mean Table
+#Adding marginal Hybrid and Location Means 
+
+   LocxHybrid_mean <- round(acast( cottonGE_dm ,Loc~Hybrid, mean ),2)
+      LocxHybrid_mean_table <- rbind(LocxHybrid_mean, Mean_yield = Hybrid_mean[,1])
+       LocxHybrid_mean_summary   <- as.data.frame(LocxHybrid_mean_table) %>% 
+              rownames_to_column(var = "Location") %>% 
+              mutate(LocIndex = rowMeans(.[, 2:6]))
+
+write_xlsx(list( Loc_mean  =   Loc_mean,
+                 Hybrid_mean = Hybrid_mean,
+                 cottonGE_dm =  cottonGE_dm,
+                HybridxLoc_mean_Summary = HybridxLoc_mean_Summary,
+                 LocxHybrid_mean_summary  =  LocxHybrid_mean_summary  ) ,
+       "D:/ProductDevelopment/R_Projects/Cotton/Cotton_SC/HAT/GxEAnalysis/Results/GE7_Mean_tables.xlsx")  
+```
+   
+
+
+
+## Analysis of G X E interaction  Unreplicated  data set                     
+      
+  1. Anova  using  aova                                                  
+  2. LIneaer Regression analyis 
+  3. Stability Parameters - Mean Yield , Regression coefficients
+  4. Combined regression lines  for all  the hybrids 
+
+```{r}
+
+#Summary tables of  Verifing the frequency  Locations, Hybrids 
+
+ Summary_Loc <- table( cottonGE$Loc) 
+ Summary_Hybrid <- table( cottonGE$Hybrid) 
+ Summary_HybridxLoc <- table( cottonGE$Hybrid, cottonGE$Loc) 
+
+#Working on the  the dataset  created previously LocxHybrid_mean_summary 
+ 
+#Eberahrt and Russel Model Method I
+#Melting the ExG_mean_summary and renaming Variable 
+              
+  LocxHybrid_mean_final <- LocxHybrid_mean_summary  %>% 
+          slice(-n()) # removing last row - Mean yield 
+
+ 
+
+  LocxHybrid_melt <- melt( LocxHybrid_mean_final ,
+            measure.vars = c("HC20107", "Aatish", "HC20103","RCH659", "HC20105"), 
+                     id.var = c("Location", "LocIndex")) %>%  
+                              rename(Hybrid = variable,
+                                     Yield = value)
+
+    
+#ModelG X E interaction - using lm() & anova() 
+
+       cottonGE_reg <- lm(Yield  ~ Location*Hybrid, LocxHybrid_melt)
+       cottonGE_summ <- summary(cottonGE_reg) 
+
+#ANOVA
+       cottonGE_anova_lm <- as.data.frame(anova(cottonGE_reg)) %>% 
+           rownames_to_column(var = "Source" )
+           
+#Model G X E interaction - using lm() & anova()   
+
+      cottonGE_Linear <- lm(Yield  ~ Hybrid *LocIndex, LocxHybrid_melt)
+      
+#summary(cottonGE_Linaer)
+
+      anova_linear <- as.data.frame(anova( cottonGE_Linear)) %>% 
+           rownames_to_column(var = "Source" )
+
+ 
+options(scipen = 999) #scientific to numeric value
+#Combining  cottonGE_anova_table and anova_lm 
+    eberhart_russel <- bind_rows( cottonGE_anova_lm ,anova_linear) %>% 
+      mutate_at(3:5, funs(round(., 2))) %>% 
+      mutate_at( 6 , funs(round(., 4))) %>% 
+      rename(DF = Df,
+      SumsSq  = "Sum Sq",
+      MeansSq =  "Mean Sq",
+      Fratio =   "F value",
+      ProbF = "Pr(>F)") %>%
+      slice(-4,-5,-8)
+# print anova
+  eberhart_russel
+
+
+
+#Calculating for Locations and Hybrids 
+     
+          Source <- "Deviations"
+          DF <- eberhart_russel$DF[3] - eberhart_russel$DF[5] 
+          SumsSq <- eberhart_russel$SumsSq[3] - eberhart_russel$SumsSq[5]
+          MeansSq <- SumsSq/DF
+          Fratio <- NA
+          ProbF <- NA
+          
+          add_row <-cbind(Source, DF,SumsSq, MeansSq, Fratio,  ProbF )
+          
+          eberhart_deviations <- rbind(eberhart_russel,
+                                            add_row) %>% 
+            mutate_at(vars(DF,SumsSq, MeansSq,Fratio, ProbF), as.numeric)
+                                            
+# Calculating F values
+
+    eberhart_deviations$Fratio <-
+    eberhart_deviations$MeansSq/eberhart_deviations$MeansSq[6]
+
+#Calculating P Values for Locations and Hybrids 
+
+   eberhart_deviations$ProbF <- c((eberhart_deviations$ProbF[1] = pf(        
+                                        q= eberhart_deviations$Fratio[1], 
+                                        df1= eberhart_deviations$DF[1], 
+                                        df2=eberhart_deviations$DF[6], 
+                                        lower.tail=FALSE)))
+
+
+#Creating  row for Env+GenxEnv(Linear)
+     eberhart_russel_anova <-  eberhart_deviations %>% 
+      filter( Source %in% c("LocIndex", "Hybrid:LocIndex","Deviations")) %>% 
+      rbind( c("Loc.+HybridsxLoc.(Linear)", sum(.$DF), 
+                sum(.$SumsSq),
+                sum(.$MeansSq))) %>% 
+      filter(Source  == "Loc.+HybridsxLoc.(Linear)") %>% 
+      rbind( eberhart_deviations, .) %>% 
+      mutate(Source = replace(Source, Source	== "Hybrid" , "Hybrids"),
+             Source = replace(Source, Source	== "Loc" , "Locations"),
+             Source = replace(Source, Source	== "Loc:Hybrid", 
+                               "Hybrids x Locations") ,
+             Source = replace(Source, Source	== "LocIndex" , 
+                                   "Locations(Linear)"),
+             Source = replace(Source, Source	== "Hybrid:LocIndex" , 
+                              "Hybrids x Loc.(Linear)"),
+             Source = replace(Source, Source ==	"Deviations", 
+                              "Pooled Deviations")) %>% 
+        mutate(Fratio = ifelse(Fratio %in% c("NaN","Loc.+HybridsxLoc.(Linear)"), 
+                   "", Fratio ) ,
+               ProbF = ifelse(ProbF %in% c("NaN", "165"),"", ProbF)) %>% 
+               mutate_at(vars(DF,SumsSq, MeansSq,Fratio, ProbF), as.numeric)%>% 
+                        slice(1,2,3,7,4,5,6) %>% 
+               mutate( DF = round(DF,0),
+                       SumsSq = round(SumsSq,0),
+                       MeansSq = round(MeansSq,0),
+                         Fratio  = round(Fratio,2),
+                         ProbF  =  round(ProbF,8),
+                         (eberhart_deviations$ProbF[2] = pf(        
+                                        q=eberhart_deviations$Fratio[2], 
+                                        df1= eberhart_deviations$DF[2], 
+                                        df2=eberhart_deviations$DF[6], 
+                                        lower.tail=FALSE)),
+                            (eberhart_deviations$ProbF[3] = pf(        
+                                        q=eberhart_deviations$Fratio[3], 
+                                        df1= eberhart_deviations$DF[3], 
+                                        df2=eberhart_deviations$DF[6], 
+                                        lower.tail=FALSE)),
+                            (eberhart_deviations$ProbF[4] = pf(        
+                                        q=eberhart_deviations$Fratio[4], 
+                                        df1= eberhart_deviations$DF[4], 
+                                        df2=eberhart_deviations$DF[6], 
+                                        lower.tail=FALSE)),
+                            (eberhart_deviations$ProbF[4] = pf(        
+                                        q=eberhart_deviations$Fratio[5], 
+                                        df1= eberhart_deviations$DF[5], 
+                                        df2=eberhart_deviations$DF[6], 
+                                        lower.tail=FALSE)),
+                            (eberhart_deviations$ProbF[6] = NA)) %>% 
+                           select(Source, DF,SumsSq,MeansSq, Fratio,ProbF)
+#Print the anaova tables 
+  eberhart_russel_anova
+ 
+     
+write_xlsx(list( LxH_means  =  LocxHybrid_mean_final,
+                 LxH_Table_analyis = LocxHybrid_melt,
+                 Eberhart_ANOVA =  eberhart_russel,
+                 Eberhart_Final_anova=  eberhart_russel_anova) ,
+       "D:/ProductDevelopment/R_Projects/Cotton/Cotton_SC/HAT/GxEAnalysis/Results/GE8_GxE_anlysis_tables.xlsx")  
+
+```
+
+
+### Linear Regression Plots 
+### Computing Stability Parameters
+
+```{r}
+
+#Fitting model  by group Hybrid
+
+library(dplyr)
+library(purrr)
+library(broom)
+
+
+ reg_stat <- LocxHybrid_melt %>% 
+     group_by(Hybrid) %>%
+     do(model = lm(Yield  ~ LocIndex, data = .)) %>% 
+     ungroup %>% 
+     transmute(Hybrid, fitcoef = map(model, tidy)) %>% 
+     unnest(fitcoef)
+     
+ reg_stat_locIndex <- reg_stat %>% 
+     filter(term == "LocIndex")
+
+
+# get the coefficients by group in a tidy data_frame
+
+
+ reg_intercept_stat <- reg_stat %>% 
+             filter(term =="(Intercept)") %>% 
+             rename(Intercept = estimate) %>% 
+             select(-term, -std.error, -statistic, -p.value) %>% 
+             bind_cols(Hybrid_mean, reg_stat_locIndex )%>% 
+             dplyr::rename(Yield  = Hybrid_mean,
+                    Regression = estimate,
+                    statistic = statistic,
+                    Hybrid= Hybrid...1) %>% 
+             select(-Hybrid...4) %>% 
+              mutate_at(vars(Yield,Regression, Intercept, statistic), 
+                    funs(round(., 2))) %>%  
+              select(-term, Hybrid, Yield, everything())
+
+
+# HCange Hybrid to factor level of LocxHybrid_melt 
+      LocxHybrid_melt$Hybrid <- as.factor(LocxHybrid_melt$Hybrid)
+
+
+myformula <- y~x
+regressionplot <- ggplot(LocxHybrid_melt, aes(x= LocIndex, 
+                              y= Yield , 
+                              group = Hybrid, 
+                              colour= Hybrid))+
+  geom_smooth(method = "lm", se=FALSE, formula = myformula)+
+  geom_point()+
+  stat_poly_eq(formula = myformula,
+                eq.with.lhs = "italic(hat(y))~`=`~",
+                aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")), 
+                parse = TRUE) + 
+   labs(title="Linear Regression of Hybrid Yield Perfromance across Locations  and Environment Index",
+         x = "Environment Index", 
+         y = "Yield") +
+#HCange the color, the size and the face of
+# the main title, x and y axis labels
+ theme(
+plot.title = element_text(color = "red", size = 14, face = "bold.italic"),
+axis.title.x = element_text(color = "blue", size = 14, face = "bold"),
+axis.title.y = element_text(color = "#993333", size = 14, face = "bold")
+)
+            
+#print outputs
+
+   eberhart_russel_anova   
+   reg_intercept_stat
+   regressionplot
+
+#Output Linear Regression Graph
+
+   regressionplot 
+   
+  write_xlsx(list(GxEAnova =  eberhart_russel_anova,
+                  Reg_Intercept_stat =  reg_intercept_stat,
+             Stability_parameters = reg_intercept_stat) ,
+           "D:/ProductDevelopment/R_Projects/Cotton/Cotton_SC/HAT/GxEAnalysis/Results/GE9_GxEResultsSummary.xlsx")
+
+  
+```
+
+
+
+#  Creating Datasets for HC20103 for linear regresion for construction regression plots 
+   based on  Eberhar and Russel  
+
+# a. Computing  the Environment(Locationmean_YLD) Index values 
+
+```{r}
+#Computing  the Environment(Locationmean_YLD) Index values 
+
+    regdataYield <- cottonGE %>%
+      ungroup(Loc) %>% 
+      select(Trial,State,Loc,Hybrid, Yield ) %>%
+      gather(key, val, -c(Trial,State,Loc,Hybrid)) %>% 
+      group_by(Trial, State, Loc, Hybrid) %>% 
+      mutate(N = row_number()) %>% 
+      select(-key, -N) %>% 
+      spread(Hybrid,val) %>% 
+      rowwise() %>%  
+      mutate(Locationmean_YLD = mean(c(HC20107, Aatish, HC20103, RCH659, HC20105), 
+                                     na.rm = TRUE)) %>% 
+      mutate_if(is.numeric, round,0)
+
+
+###################################################################################
+
+#Creating Datasets for  by extracting  data from regdataYield dataset  for eaHC comparison  of New hybrids  and HCecks  and  finally combing datasets   
+
+
+# Data set for HC20103 and Aatish  comparison   
+
+    HC20103_Aatish_CC <- regdataYield %>% 
+      select(Trial, State,Loc, Aatish, Locationmean_YLD) %>% 
+       mutate(HCeckType = "HC20103 Vs Aatish",
+             Group     = "HCeck" ) %>% 
+      rename(EnvIndex = Locationmean_YLD,
+             Yield = Aatish)
+   
+
+   
+   HC20103_Aatish_NH <- regdataYield %>% 
+   select(Trial, State,Loc, HC20103,Locationmean_YLD) %>% 
+      mutate(HCeckType = "HC20103 Vs Aatish",
+             Group = "New Hybrid") %>% 
+      rename(EnvIndex = Locationmean_YLD,
+             Yield = HC20103) 
+             
+             
+# Data set for HC20103 and RCH659  comparison   
+
+    HC20103_RCH659_CC <- regdataYield %>% 
+      select(Trial, State,Loc, RCH659, Locationmean_YLD) %>% 
+       mutate(HCeckType = "HC20103 Vs RCH659",
+             Group     = "HCeck" ) %>% 
+      rename(EnvIndex = Locationmean_YLD,
+             Yield = RCH659)
+   
+   
+   HC20103_RCH659_NH <- regdataYield %>% 
+   select(Trial, State,Loc, HC20103,Locationmean_YLD) %>% 
+      mutate(HCeckType = "HC20103 Vs RCH659",
+             Group = "New Hybridrid") %>% 
+      rename(EnvIndex = Locationmean_YLD,
+             Yield = HC20103) 
+             
+             
+######################################################################################
+
+# Data set for HC20105 and Aatish comparison   
+
+    HC20105_Aatish_CC <- regdataYield %>% 
+      select(Trial, State,Loc, Aatish, Locationmean_YLD) %>% 
+       mutate(HCeckType = "HC20105 Vs Aatish",
+             Group     = "HCeck" ) %>% 
+      rename(EnvIndex = Locationmean_YLD,
+             Yield = Aatish)
+   
+
+   
+   HC20105_Aatish_NH <- regdataYield %>% 
+   select(Trial, State,Loc, HC20105,Locationmean_YLD) %>% 
+      mutate(HCeckType = "HC20105 Vs Aatish",
+             Group = "New Hybrid") %>% 
+      rename(EnvIndex = Locationmean_YLD,
+             Yield = HC20105) 
+             
+             
+# Data set for HC20105 and RCH659  comparison   
+
+    HC20105_RCH659_CC <- regdataYield %>% 
+      select(Trial, State,Loc, RCH659, Locationmean_YLD) %>% 
+       mutate(HCeckType = "HC20105 Vs RCH659",
+             Group     = "HCeck" ) %>% 
+      rename(EnvIndex = Locationmean_YLD,
+             Yield = RCH659)
+   
+   
+   HC20105_RCH659_NH <- regdataYield %>% 
+   select(Trial, State,Loc, HC20105,Locationmean_YLD) %>% 
+      mutate(HCeckType = "HC20105 Vs RCH659",
+             Group = "New Hybridrid") %>% 
+      rename(EnvIndex = Locationmean_YLD,
+             Yield = HC20105) 
+             
+             
+######################################################################################
+
+
+
+# Data set for HC20107 and Aatish comparison   
+
+    HC20107_Aatish_CC <- regdataYield %>% 
+      select(Trial, State,Loc, Aatish, Locationmean_YLD) %>% 
+       mutate(HCeckType = "HC20107 Vs Aatish",
+             Group     = "HCeck" ) %>% 
+      rename(EnvIndex = Locationmean_YLD,
+             Yield = Aatish)
+   
+
+   
+   HC20107_Aatish_NH <- regdataYield %>% 
+   select(Trial, State,Loc, HC20107,Locationmean_YLD) %>% 
+      mutate(HCeckType = "HC20107 Vs Aatish",
+             Group = "New Hybrid") %>% 
+      rename(EnvIndex = Locationmean_YLD,
+             Yield = HC20107) 
+             
+             
+# Data set for HC20107 and RCH659  comparison   
+
+    HC20107_RCH659_CC <- regdataYield %>% 
+      select(Trial, State,Loc, RCH659, Locationmean_YLD) %>% 
+       mutate(HCeckType = "HC20107 Vs RCH659",
+             Group     = "HCeck" ) %>% 
+      rename(EnvIndex = Locationmean_YLD,
+             Yield = RCH659)
+   
+   
+   HC20107_RCH659_NH <- regdataYield %>% 
+   select(Trial, State,Loc, HC20107,Locationmean_YLD) %>% 
+      mutate(HCeckType = "HC20107 Vs RCH659",
+             Group = "New Hybridrid") %>% 
+      rename(EnvIndex = Locationmean_YLD,
+             Yield = HC20107) 
+             
+             
+######################################################################################
+
+
+
+# Combining all comparison (New hybrids vs HCecks )datasets  for regregression
+
+   allcombinedRegression <- rbind( HC20103_Aatish_NH,
+                                      HC20103_Aatish_CC,
+                                      HC20103_RCH659_NH,
+                                      HC20103_RCH659_CC,
+                                      HC20105_Aatish_NH,
+                                      HC20105_Aatish_CC,
+                                      HC20105_RCH659_NH,
+                                      HC20105_RCH659_CC,
+                                      HC20107_Aatish_NH,
+                                      HC20107_Aatish_CC,
+                                      HC20107_RCH659_NH,
+                                      HC20107_RCH659_CC)
+ 
+
+# Removing Missing values 
+ allcombinedRegression_nonmiss <- na.omit(allcombinedRegression)
+ 
+ head(allcombinedRegression)
+ head(allcombinedRegression_nonmiss)
+ 
+  write_xlsx(list(RegressionData =   allcombinedRegression,
+                 RegressionData_nomissing= allcombinedRegression_nonmiss) ,
+           "D:/ProductDevelopment/R_Projects/Cotton/Cotton_SC/HAT/GxEAnalysis/Results/GxE9_LinearRegression.xlsx")
+
+   
+
+```
+
+
+
+
+# Eberaht  and Russel Linear Regression plots  for New Hybrids HCecks all HCecks  
+    
+  Creating Linear Regression graphs of Yield on Environments Index values  for new 
+  Hybrids  Vs HCecks   
+
+
+```{r}
+
+# Eberaht  and Russel Linear Regression plots
+
+library(officer)
+
+t5 <- "D:/ProductDevelopment/R_Projects/Cotton/Cotton_SC/HAT/GxEAnalysis/Results/Hybrid_Reg.pptx"
+
+    my.formula <- y ~ x
+     Loc_Hybrid_Reg <- ggplot(data =   allcombinedRegression_nonmiss, 
+                                 aes(x =  EnvIndex,
+                                     y = Yield,
+                                     color = Group)) +
+      geom_smooth(method = "lm", se = FALSE, formula = my.formula) +
+      geom_point(alpha = 0.50) +
+      labs(plot.title ="Linear Regression for Measuring Stability",
+           subtitle = "HR19307 vs HCecks",
+           x = "Environment Index", y = "Yield(kg)" ) +
+      scale_color_manual(values = c("#FF4500",  "#00FFC4", "#32CD32")) +
+      stat_poly_eq(formula = my.formula, 
+                   aes(label = paste(..eq.label.., ..rr.label.., 
+                                     sep = "~~~")), 
+                   label.x.npc = "left", 
+                   label.y.npc = "top",
+                   parse = TRUE, 
+                   inherit.aes = TRUE,
+                   size = 3)  +      
+      facet_wrap(~HCeckType, nrow = 4) +
+      theme_bw() +
+      theme(strip.background =element_rect(fill = "#B8860B"),
+            strip.text = element_text(colour = 'white', size = 14, 
+                                      face = "bold"),
+            plot.title  = element_text(color = "white", size = 18,
+                                       hjust = 0.50, face = "bold.italic"),
+            plot.subtitle = element_text(color = "white", size = 14,
+                                         hjust = 0.50, face = "bold.italic"),
+            axis.title.x = element_text(color = "white", size = 14, 
+                                        face = "bold"),
+            axis.title.y = element_text(color = "white", size = 14, 
+                                        face = "bold"),
+            axis.text.x = element_text(color ="white",size=10), 
+            axis.text.y = element_text(color ="white",size=10),
+            panel.border = element_rect(color="darkred", size = 0.5,  
+                                        linetype="solid"),
+            legend.justification = c(3,0), legend.position = "right")
+    
+    fig_vg <- dml(ggobj =   Loc_Hybrid_Reg )
+    
+    read_pptx() %>% 
+      add_slide(layout = "Title Only", master = "Office Theme") %>% 
+      ph_with(fig_vg, location = ph_location(left = .5, top = 1.3, 
+      height = 6, width = 10)) %>% 
+      print(t5)
+    
+    Loc_Hybrid_Reg 
+    
+    
+```
+
+# AMMI Biplot Analysis with Agricolae and Metan Package
+
+      1. Stability Parameters
+      2. AMMI  biplots
+
+
+## 1. Agricolae Package  - Stability.par functin
+    
+  - This stability parametric model procedure calculates the stability variations as 
+    well as the statistics of ("SHUKLA'S STABILITY VARIANCE AND KANG'S") 
+  - The averages of the genotype through the different environment repetitions are
+    required for the calculations 
+  - The mean square error must be calculated from the joint variance analysis in 
+    previous steps
+
+```{r}
+
+#Load library(agroclae) and library(metan)
+#Work on previously created datset HybridxLoc_mean
+#Convert HybridxLoc_mean  as dataframe
+   
+# Replication rep = 1
+# Mean square error, 
+# MSerror =  64904
+# 73 environment
+# 5 genotype  = 1,2,3,.., 17
+
+
+library(agricolae)
+ 
+    HybridxLoc_data_stabilty <- as.data.frame(HybridxLoc_mean) %>% 
+            select_if(~ !any(is.na(.)))
+            
+    Error <- eberhart_russel_anova$MeansSq[7] 
+    Reps <- c(2)
+    
+    
+    EnvIndex <- apply(HybridxLoc_data_stabilty,2, mean)
+    EnvIndex2 <- as.vector(EnvIndex)
+    
+# Stability Analysis
+
+
+      Output_stability  <- stability.par(  HybridxLoc_data_stabilty, 
+                                           rep =   Reps , 
+                                           MSerror=Error,
+                                           name.cov= "EnvIndex",
+                                           file.cov=EnvIndex)
+
+# Stability analysis - ANOVA
+
+      Stability_Anova <- Output_stability$analysis %>% 
+         rownames_to_column(var = "Source")
+
+
+#Mean Yield and Ecovalence 
+
+     Stability_stat <- Output_stability$statistics %>% 
+       rownames_to_column(var = "Hybrid")
+
+#Mean Yield,Rank, Stability Variance  and Ysi estimates 
+
+     Stability_parametrs <-  Output_stability$stability %>% 
+        select( -"...") %>% 
+        rownames_to_column(var = "Hybrid")
+
+
+write_xlsx(list(Stability_Anova =   Stability_Anova,
+               stbility_stat  =  Stability_stat,
+                stability_parametrs =  Stability_parametrs ) ,
+           "D:/ProductDevelopment/R_Projects/Cotton/Cotton_SC/HAT/GxEAnalysis/Results/GE10_Agricola_Regression_stat.xlsx")
+
+```
+
+
+ 
+           
+# AMMI analysis and Plots  
+
+  - Additive Main Effects and Multiplicative Interaction Models (AMMI) are widely 
+  used to analyze main effects and genotype by environment (GEN, ENV) interactions 
+  in multilocation variety Trials. 
+  - Furthermore, this function generates data to biplot, triplot graphs and 
+  analysis
+
+
+# 2. ANALYSIS AMMI using Agricolae Package
+    
+    - The model AMMI uses the biplot constructed through the principal components 
+    generated by the interaction environment-genotype. If there is suHC interaction, 
+    the percentage of the two principal components would explain more than the 50% of
+    the total variation; in suHC case, the biplot would be a good alternative to 
+    study the interaction environment-genotype [@Cros:1990].
+    
+    - The data can be organized in columns, thus: environment, genotype, repetition, 
+    and variable.
+
+    - When performing AMMI, this generates the Biplot, Triplot and Influence 
+      graphics, 
+
+### Based on the AMMI analysis we can calculate the AMMI stability value (ASV) and the Yield 
+    stability value (YSV) using the function index.AMMI() following (PurHCase, 1997) and 
+    (Sabaghnia and Dehghani,2008)
+    
+
+```{r}
+#AmmiAnalysis
+
+
+  vectorCols <- colnames(HybridxLoc_data_stabilty)
+  vectorrows<- rownames(HybridxLoc_data_stabilty)
+  Yield <- as.vector(unlist(HybridxLoc_data_stabilty[vectorCols ]))
+
+
+
+  Environment <- rep(rownames(HybridxLoc_data_stabilty),42)
+  Genotype <- rep(colnames(HybridxLoc_data_stabilty),5)
+  Reps <- c(2)
+  Error <-  eberhart_russel_anova$MeansSq[7]
+
+# Ammi Model
+
+
+    Ammmimodel <- AMMI(ENV = Environment, 
+                              GEN = Genotype, 
+                              REP = Reps ,
+                              Y= Yield, 
+                              MSE= Error ,
+                              console = TRUE)  
+
+
+# Ammi Analysis of Variance Table 
+
+    Ammi_ANOVA <- as.data.frame(Ammmimodel$ANOVA)
+    print(Ammi_ANOVA, na.print = "")
+    
+    Ammi_ANOVA
+    
+# Ammi PCA Analysis 
+   
+   Ammi_PCA_Analysis <- Ammmimodel$analysis %>% 
+      rownames_to_column(var = "Item") %>% 
+                  rename( DF = Df,
+                  PCA_percent = percent,
+                  Cumulative_PCT =acum) %>% 
+                  select( Item, DF,  PCA_percent, Cumulative_PCT,everything())
+                  
+    Ammi_PCA_Analysis 
+    
+
+# Based on the AMMI analysis we can calculate the AMMI stability value (ASV)and 
+# The Yield stability value (YSV) using the function index.AMMI() 
+   
+     index<-index.AMMI(Ammmimodel)
+    
+# Crops with improved stability according AMMI
+
+    Ammi_ASV <- as.data.frame(index[order(index[,3]),])
+    Ammi_ASV
+    
+
+  
+write_xlsx(list( Ammi_ANOVA  =   Ammi_ANOVA,
+                Ammi_PCA_Analysis   = Ammi_PCA_Analysis,
+                Ammi_ASV_stability = Ammi_ASV ) ,
+           "D:/ProductDevelopment/R_Projects/Cotton/Cotton_SC/HAT/GxEAnalysis/Results/GE10_Agricola_Ammi_stat.xlsx")
+
+```
+
+
+
+
+
+
+# Analyzing multienvironment Trials using  Ammi and GGE Biplots  using Metan Package 
+# Creating AMMI Biplots
+
+###  Load library(metan) 
+###  Applying Metan package AMMI analysis on previously createddataset LocxHybrid_melt
+###  Based on means of genotype-environment data
+
+```{r}
+
+# Ammi Plot
+  LocxHybrid_melt_metan <- LocxHybrid_melt %>% 
+         select(-LocIndex) %>% 
+         mutate(Reps = 1)
+
+  data_means <- means_by(LocxHybrid_melt_metan, 
+                         ENV = Location, 
+                         GEN = Hybrid,
+                         Yield )
+
+# WAAS index
+
+       cotton_waasmodel <- waas_means(data_means,
+                                     ENV,
+                                     GEN,
+                                    resp = Yield )
+
+      AMMI_metan_stat <-cotton_waasmodel$Yield $model %>% 
+          mutate_at(vars(PC1, PC2, PC3,PC4, WAAS, PctResp, PctWAAS), 
+          funs(round(.,2)))
+          
+          
+ # AMMI1 Biplot type 1:  Yield  x PC1                     
+        metan_ammiplot_1 <- plot_scores(cotton_waasmodel,
+                 type = 1,
+                 polygon = FALSE,
+                 col.gen = "blue",
+                 col.env = "green4",
+                 size.text.gen = 3,
+                 size.text.env = 0.5,
+                 col.segm.env = "gray70",
+                 axis.expand = 1.5)                     
+                                    
+         metan_ammiplot_2 <-  plot_scores(cotton_waasmodel ,
+                 type = 2,
+                 polygon = TRUE,
+                 col.gen = "blue",
+                 col.env = "green4",
+                 size.text.gen = 3,
+                 size.text.env = 0.5,
+                 col.segm.env = "gray70",
+                 axis.expand = 1.5)
+                 
+                 
+          metan_ammiplot_3 <- plot_scores(cotton_waasmodel, 
+                 type = 3,
+                 polygon = FALSE,
+                 col.gen = "blue",
+                 col.env = "green4",
+                 size.text.gen = 3,
+                 size.text.env = 0.5,
+                 col.segm.env = "gray70",
+                 axis.expand = 1.5)
+#output plots
+   AMMI_metan_stat
+   metan_ammiplot_1
+   metan_ammiplot_2
+   metan_ammiplot_3
+```
+
+
+
+
+# 2. GGE Biplots: Genotype plus genotype-by-environment model
+
+   - Produces genotype plus genotype-by-environment model based on a multi-environment Trial 
+     dataset containing at least the columns for genotypes, environments and one response 
+     variable or a two-way table.
+
+
+# GGE Biplot mode
+
+    This produces a GGE model using a data frame containing at least the columns for Hybrids, 
+    Locations and the response variable, Yiels 
+    
+    Ten types of GGE biplots are possible 
+    
+    | *	type = 1 A basic biplot
+    | *	type = 2 Mean performance vs stability
+    | *	type = 3 WhiHC-won-where
+    | *	type = 4 Discriminativeness vs representativeness.
+    | *	type = 5 Examine an environment
+    | *	type = 6 Ranking environments
+    | *	type = 8 Ranking Hybrids
+    | *	type = 9 Compare two Hybrids
+    | *	type = 10 Relationship among environments
+
+
+#  Biplot type 1: A basic biplot ; This is the default setting in the function plot, thus, 
+   this biplot is produced by just calling plot(model), as shown below.
+
+```{r}
+
+#  Biplot type 1
+
+  cottonGE_final <- cottonGE %>% 
+            select(Trial,State, Loc,Hybrid,Yield) %>% 
+            ungroup %>% 
+             rename(Location = Loc)
+  
+  gge_biplot <- gge(cottonGE_final, 
+                   Location, 
+                   Hybrid,
+                   Yield)
+       
+  
+  # Biplot type 1 : Basic Plot 
+  
+  gge_biplot1 <- gge(cottonGE_final, 
+                   Location, 
+                   Hybrid,
+                   Yield)
+                   
+  basic_plot_type1 <- plot(gge_biplot1,
+            col.gen = "blue",
+            col.env = "green4",
+            type  = 1,
+            size.text.env = 3,
+            size.text.gen = 2,
+            plot_theme = theme_metan(grid =  "both"))
+  
+  basic_plot_type1
+  
+``` 
+  
+  basic_plot_type1
+
+
+#  Biplot Type 2: Mean performance vs stability
+
+####
+
+Average environment coordination (AEC) views of the GGE-biplot based on environment-focused scaling for the means performance and stability of Hybrids.
+
+```{r}
+
+#Biplot Type 2: Mean performance vs stability
+
+gge_biplot2 <- gge(cottonGE_final, 
+                 Location, 
+                 Hybrid, 
+                 Yield, 
+                 svp = "genotype")
+
+plot_type2 <- plot(gge_biplot2,
+          type = 2,
+          col.gen = "blue",
+          col.env = "green4",
+          size.text.gen = 4,          
+          size.text.env = 3,
+          plot_theme = theme_metan(grid =  "both"))
+          
+plot_type2
+
+```
+
+### Biplot Type 3: WhiHC-won-where: In this biplot a polygon is drawn joining the genotypes   
+    that are located farthest from the biplot origin so that all other genotypes are contained     in the polygon
+
+```{r}
+# Biplot type 3: WhiHC-won-where
+
+  gge_biplot3 <- gge(cottonGE_final, 
+                 Location, 
+                 Hybrid, 
+                 Yield, 
+                 svp = "symmetrical")
+                   
+  plot_type3 <- plot(gge_biplot3,
+            type = 3,
+            col.gen = "blue",
+            col.env = "green4",
+            size.shape.win = 2,
+            size.text.env = 3,
+            size.text.gen = 3,
+            large_label = 3)
+  plot_type3
+
+```
+ 
+ 
+ plot_type3
+
+##  Biplot type 4: Discriminativeness vs. representativeness. This GGE-biplot based on 
+    Hybrid-focused scaling for comparison of the Hybrids with the ideal Hybrid
+
+```{r}
+
+# Biplot type 4: Discriminativeness vs. representativeness
+
+  gge_biplot4 <- gge(cottonGE_final, 
+                   Location, 
+                   Hybrid,
+                   Yield)
+  
+  plot_type4 <- plot(gge_biplot4,
+            type = 4,
+            col.gen = "blue",
+            col.env = "green4",
+            size.text.env = 3,
+            size.text.gen = 3,
+            plot_theme = theme_metan(grid =  "both"))
+  
+  plot_type4 
+
+``` 
+
+
+
+### Biplot type 5: Examine an environment . Identifying genotypes most adapted to an 
+   environment can be easily aHCieved via a GGE biplot. For example, to visualize the 
+   performance of different genotypes in a given environment, e.g., TS10
+
+```{r}
+#Biplot type 5: Examine an environment
+
+ggbiplot5 <- gge(cottonGE_final, 
+                 Location, 
+                 Hybrid, 
+                 Yield, 
+                 svp = "symmetrical")
+                 
+plot_type5 <- plot(ggbiplot5,
+          type = 5,
+          sel_env = "MR11",
+          col.gen = "blue",
+          col.env = "green4",
+          size.text.env = 8,
+          size.text.gen = 5,
+          size.shape.win = 4,
+          large_label = 3,
+          axis_expand = 1.25)
+          
+plot_type5
+
+```
+
+
+
+
+### Biplot type 6: Ranking environments. In this biplot the "ideal" environment is used as the
+    center of a set of concentric lines that serve as a ruler to measure the distance between 
+    an environment and the ideal environment
+
+```{r}
+
+# Biplot type 6: Ranking environments
+
+  gge_biplot6 <-  gge(cottonGE_final, 
+                   Location, 
+                   Hybrid, 
+                   Yield, 
+                   svp = "symmetrical")
+                   
+  plot_type6 <- plot(gge_biplot6,
+            type = 6,
+            col.env = "blue",
+            col.circle = "red",
+            col.alpha.circle = 0.5,
+            size.text.env = 3,
+            axis_expand = 1.5,
+            plot_theme = theme_metan(color.background = "white"))
+            
+  plot_type6        
+
+```
+
+
+ 
+
+### Biplot type 7: Examine a genotype: This biplot compares all genotypes with the "ideal" 
+  genotype The ideal genotype, represented by the small circle with an arrow pointing to it, 
+  is defined as having the highest yield in all environments. 
+
+```{r}
+# Biplot type 7: Examine a genotype
+
+# Biplot type 7: Examine a genotype
+  gge_bioplot7 <- gge(cottonGE_final, 
+                  Location, 
+                  Hybrid, 
+                  Yield, 
+                  svp = "genotype")
+                  
+  plot_type7 <- plot(gge_bioplot7,
+            type = 7,
+            sel_gen = "HC20105",
+            col.gen = "green4",
+            col.env = "blue",
+            size.text.env = 1,
+            axis_expand = 1.5,
+            plot_theme = theme_metan(grid = "both"))
+
+
+plot_type7
+
+``` 
+
+
+   
+
+### Biplot type 8: Ranking genotypes. This biplot compares all genotypes with the "ideal" 
+    genotype The ideal genotype, represented by the small circle with an arrow pointing to it,     is defined as having the highest yield in all environments
+
+
+```{r}
+
+#Biplot type 8: Ranking genotypes
+
+plot_type8 <- gge(cottonGE_final, 
+                  Location, 
+                  Hybrid, 
+                  Yield,
+                  svp = "genotype")
+
+plot_type8  <- plot(plot_type8 ,
+          type = 8,
+          col.gen = "blue",
+          col.env = "red",
+          col.line = "red",
+          size.text.gen = 3,
+          size.text.env = 3,
+          plot_theme = theme_metan_minimal())
+          
+plot_type8 
+
+```
+
+
+plot_type8 
+
+### Biplot type 9: Compare two genotypes:o compare two genotypes, for example, DMH8255 and
+    PHI3401, draw a connector line to connect them and draw a perpendicular line that passes 
+    through the biplot origin and is perpendicular to the connector line.  
+
+```{r}
+#Biplot type 9: Compare two genotypes
+gge_bioplot9 <- gge(cottonGE_final, 
+                   Location, 
+                   Hybrid, 
+                  Yield, svp = "symmetrical")
+
+plot_type9 <- plot(gge_bioplot9,
+          type = 9,
+          sel_gen1 = "RCH659",
+          sel_gen2 = "HC20105",
+          col.gen  = "green4",
+          size.text.gen = 4,
+          size.text.env = 3)
+plot_type9
+
+```
+
+ 
+# Biplot type 10: Relationship among environments. GGE biplot graph showing relationships 
+  between test environments
+
+
+```{r}
+#Biplot type 10: Relationship among environments
+
+gge_biplot10 <- gge(cottonGE_final, 
+                    Location, 
+                    Hybrid, 
+                    Yield)
+
+plot_type10 <- plot(gge_biplot10,
+          type = 10,
+          col.gen = "blue",
+          col.env = "green4",
+          size.text.gen = 10,
+          size.text.env =3)
+
+plot_type10
+
+```
+
+plot_type10
